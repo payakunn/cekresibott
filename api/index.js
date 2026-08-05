@@ -11,50 +11,64 @@ module.exports = async (req, res) => {
     const chatId = body.message.chat.id;
     const teks = body.message.text?.trim() || "";
 
+    // 👋 Pesan Sambutan
     if (teks === "/start") {
       await kirimPesan(chatId, "👋 Halo! Kirim nomor resi untuk melacak!");
       return res.send({ ok: true });
     }
 
+    // 📦 Cek nomor resi
     if (!/^\d+$/.test(teks)) return res.send({ ok: true });
 
+    // 🔍 Ambil data dari API
     const url = "https://cek-resi-fcxf.vercel.app/cek-resi/" + teks;
-    const data = await (await fetch(url)).json();
+    const resApi = await fetch(url, { timeout: 15000 });
+    const data = await resApi.json();
 
-    if (!data || !data.data) {
-      await kirimPesan(chatId, "❌ Resi " + teks + " tidak ditemukan!");
-      return res.send({ ok: true });
-    }
+    // 📩 Susun balasan
+    if (data && data.data) {
+      const d = data.data;
+      const ekspedisi = (d.courier || d.expedisi || "-").toUpperCase();
+      const status = d.status || "-";
+      const layanan = d.service || d.layanan || "NONCOD";
+      const pengirimNama = d.origin?.name || d.pengirim?.nama || "-";
+      const pengirimKota = d.origin?.city || d.pengirim?.kota || "-";
+      const penerimaNama = d.destination?.name || d.penerima?.nama || "-";
+      const penerimaKota = d.destination?.city || d.penerima?.kota || "-";
 
-    const d = data.data;
-    let balasan = "📦 EXPEDISI " + (d.expedisi || "-").toUpperCase() + "\n";
-    balasan += "└ " + (d.expedisi || "-") + " Express\n\n";
-    balasan += "📮 Resi\n";
-    balasan += "├ Service : " + (d.layanan || "NONCOD") + "\n";
-    balasan += "└ No Resi : " + teks + "\n\n";
-    balasan += "🚦 Status\n";
-    balasan += "└ Status : " + (d.status || "-") + "\n\n";
-    balasan += "📤 Pengirim\n";
-    balasan += "├ " + (d.pengirim?.nama || "-") + "\n";
-    balasan += "└ " + (d.pengirim?.kota || "-") + "\n\n";
-    balasan += "📥 Penerima\n";
-    balasan += "├ " + (d.penerima?.nama || "-") + "\n";
-    balasan += "└ " + (d.penerima?.kota || "-") + "\n\n";
-    balasan += "📋 POD Detail\n";
+      let balasan = "📦 EXPEDISI " + ekspedisi + "\n";
+      balasan += "└ " + ekspedisi + " Express\n\n";
+      balasan += "📮 Resi\n";
+      balasan += "├ Service : " + layanan + "\n";
+      balasan += "└ No Resi : " + teks + "\n\n";
+      balasan += "🚦 Status\n";
+      balasan += "└ Status : " + status + "\n\n";
+      balasan += "📤 Pengirim\n";
+      balasan += "├ " + pengirimNama + "\n";
+      balasan += "└ " + pengirimKota + "\n\n";
+      balasan += "📥 Penerima\n";
+      balasan += "├ " + penerimaNama + "\n";
+      balasan += "└ " + penerimaKota + "\n\n";
+      balasan += "📋 POD Detail\n";
 
-    if (d.perjalanan?.length > 0) {
-      d.perjalanan.forEach(item => {
-        balasan += "✅ " + (item.keterangan || "") + "\n";
-        balasan += "└ " + (item.tanggal || "") + "\n";
-      });
+      const riwayat = d.history || d.perjalanan || [];
+      if (riwayat.length > 0) {
+        riwayat.forEach(item => {
+          balasan += "✅ " + (item.desc || item.keterangan || "") + "\n";
+          balasan += "└ " + (item.date || item.tanggal || "") + "\n";
+        });
+      } else {
+        balasan += "└ Belum ada riwayat\n";
+      }
+
+      await kirimPesan(chatId, balasan);
     } else {
-      balasan += "└ Belum ada riwayat\n";
+      await kirimPesan(chatId, "❌ Resi " + teks + " tidak ditemukan atau belum ada datanya!");
     }
 
-    await kirimPesan(chatId, balasan);
     return res.send({ ok: true });
-
   } catch (err) {
+    console.error(err);
     return res.send({ ok: true });
   }
 };
