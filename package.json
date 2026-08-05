@@ -1,0 +1,9 @@
+{
+  "name": "cek-resi-bot",
+  "version": "1.0.0",
+  "description": "Bot Cek Resi Telegram",
+  "main": "api/index.js",
+  "dependencies": {
+    "node-fetch": "2.7.0"
+  }
+}
